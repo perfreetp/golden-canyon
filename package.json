@@ -1,0 +1,21 @@
+{
+  "name": "ortho-ward-qc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "骨科病区设备与管线平面图批次质检系统",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "d3": "^7.9.0",
+    "solid-js": "^1.9.3"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.7",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}
