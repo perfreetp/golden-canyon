@@ -1,0 +1,77 @@
+import type { HallConfig } from '../types';
+
+export const HALL: HallConfig = {
+  id: 'hall-a',
+  name: '童行康复中心 · 一层互动训练大厅',
+  width: 24,
+  depth: 16,
+  ceiling: 3.6,
+  defaultLoad: 300,
+  door: { wall: 'west', center: 8, width: 3.2 },
+  zones: [
+    {
+      id: 'A',
+      name: 'A 北墙承重区',
+      x: 0,
+      z: 0,
+      w: 24,
+      d: 3,
+      capacity: 600,
+    },
+    {
+      id: 'B',
+      name: 'B 中央活动区',
+      x: 3,
+      z: 3,
+      w: 18,
+      d: 10,
+      capacity: 250,
+    },
+    {
+      id: 'C',
+      name: 'C 南墙承重区',
+      x: 0,
+      z: 13,
+      w: 24,
+      d: 3,
+      capacity: 450,
+    },
+    {
+      id: 'D',
+      name: 'D 西侧出入口缓冲',
+      x: 0,
+      z: 3,
+      w: 3,
+      d: 10,
+      capacity: 300,
+    },
+    {
+      id: 'E',
+      name: 'E 东侧设备通道',
+      x: 21,
+      z: 3,
+      w: 3,
+      d: 10,
+      capacity: 300,
+    },
+  ],
+  powerPoints: [
+    { id: 'P1', x: 2.2, z: 0.35, label: 'P1' },
+    { id: 'P2', x: 8.0, z: 0.35, label: 'P2' },
+    { id: 'P3', x: 14.0, z: 0.35, label: 'P3' },
+    { id: 'P4', x: 20.0, z: 0.35, label: 'P4' },
+    { id: 'P5', x: 2.2, z: 15.65, label: 'P5' },
+    { id: 'P6', x: 8.0, z: 15.65, label: 'P6' },
+    { id: 'P7', x: 14.0, z: 15.65, label: 'P7' },
+    { id: 'P8', x: 20.0, z: 15.65, label: 'P8' },
+    { id: 'P9', x: 23.65, z: 8.0, label: 'P9' },
+    { id: 'P10', x: 23.65, z: 12.0, label: 'P10' },
+  ],
+};
+
+export const WALL_LABELS = [
+  { id: 'north', name: '北墙 · 采光面', x: 12, z: 0, axis: 'h' as const },
+  { id: 'south', name: '南墙 · 走廊面', x: 12, z: 16, axis: 'h' as const },
+  { id: 'west', name: '西墙 · 入口', x: 0, z: 8, axis: 'v' as const },
+  { id: 'east', name: '东墙 · 设备间', x: 24, z: 8, axis: 'v' as const },
+];
