@@ -1,0 +1,17 @@
+{
+  "name": "mountain-geohazard-3d-system",
+  "version": "1.0.0",
+  "description": "山区地质灾害隐患点三维判读与巡查工单系统（Vue3 + three.js，零构建纯静态）",
+  "private": true,
+  "scripts": {
+    "serve": "node tests/serve.js",
+    "test:math": "node tests/test-math.js",
+    "test:store": "node tests/test-store.js",
+    "test:browser": "node tests/test-browser.js",
+    "test:e2e": "node tests/test-e2e.js",
+    "test": "node tests/test-math.js && node tests/test-store.js && node tests/test-e2e.js",
+    "shots": "node tests/test-shots.js && node tests/test-modals.js"
+  },
+  "keywords": ["地质灾害", "three.js", "vue3", "三维地形", "群测群防", "巡查工单"],
+  "license": "MIT"
+}

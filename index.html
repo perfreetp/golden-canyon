@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>山区地质灾害隐患点三维判读与巡查工单系统</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.global.prod.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.152.2/three.min.js"></script></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-logo">⛰</span>
+      <div>
+        <div class="brand-title">山区地质灾害隐患点三维判读与巡查工单系统</div>
+        <div class="brand-sub">县地质灾害防治办公室 · 群测群防平台</div>
+      </div>
+    </div>
+    <nav class="nav-tabs">
+      <button v-for="v in views" :key="v.key" class="nav-tab"
+              :class="{ active: view === v.key }" @click="switchView(v.key)">
+        <span class="nav-icon">{{ v.icon }}</span>{{ v.label }}
+        <em v-if="v.key === 'review' && badge.review" class="badge">{{ badge.review }}</em>
+        <em v-if="v.key === 'patrol' && badge.recheck" class="badge badge-warn">{{ badge.recheck }}</em>
+      </button>
+    </nav>
+    <div class="role-box">
+      <label class="role-label">当前角色</label>
+      <select class="role-select" :value="role" @change="role = $event.target.value" @input="role = $event.target.value">
+        <option value="investigator">调查员 · 王调查</option>
+        <option value="reviewer">审核员 · 李审核</option>
+        <option value="patrol">乡镇巡查员 · 张巡查</option>
+      </select>
+      <button class="btn btn-mini" title="清空本地数据并恢复演示数据" @click="resetDemo">重置演示</button>
+    </div>
+  </header>
+
+  <!-- ============ 视图1：三维判读 ============ -->
+  <section v-show="view === 'terrain'" class="view terrain-view">
+    <div class="scene-toolbar">
+      <div class="tool-group">
+        <button class="btn" :class="{ primary: drawMode }" @click="toggleDraw">
+          {{ drawMode ? '取消圈定' : '✚ 圈定隐患点' }}
+        </button>
+        <button class="btn" :class="{ primary: houseMode }" @click="toggleHouse">放置民房</button>
+        <button class="btn" :disabled="drawPts < 3" @click="finishDraw">完成圈定({{ drawPts }})</button>
+        <button class="btn" :disabled="!selected" @click="selected && openDetail(selected.id)">查看档案 / 办理</button>
+      </div>
+      <div class="tool-group">
+        <span class="tool-label">底图渲染</span>
+        <button class="btn" :class="{ primary: colorMode === 'elevation' }" @click="setColorMode('elevation')">高程分层</button>
+        <button class="btn" :class="{ primary: colorMode === 'slope' }" @click="setColorMode('slope')">坡度渲染</button>
+      </div>
+      <div class="tool-group">
+        <label class="chk"><input type="checkbox" :checked="layers.contours" @change="toggleLayer('contours', $event)"> 等高线</label>
+        <label class="chk"><input type="checkbox" :checked="layers.flow" @change="toggleLayer('flow', $event)"> 汇水线</label>
+        <label class="chk"><input type="checkbox" :checked="layers.houses" @change="toggleLayer('houses', $event)"> 民房图层</label>
+      </div>
+      <div class="scene-tip" v-if="drawMode">左键依次落点圈定区域 → 双击或点“完成圈定”；右键拖动平移，滚轮缩放</div>
+    </div>
+    <div class="scene-body">
+      <div ref="sceneEl" class="scene-canvas"></div>
+      <aside class="hazard-panel">
+        <div class="panel-head">隐患点列表 <span class="panel-count">{{ hazards.length }}</span></div>
+        <div class="panel-filters">
+          <input v-model="listFilter.kw" class="input" placeholder="搜索编号/名称">
+          <select v-model="listFilter.township" class="input">
+            <option value="">全部乡镇</option>
+            <option v-for="t in TOWNSHIPS" :key="t">{{ t }}</option>
+          </select>
+          <select v-model="listFilter.status" class="input">
+            <option value="">全部状态</option>
+            <option v-for="s in statusList" :key="s">{{ s }}</option>
+          </select>
+        </div>
+        <div class="hazard-list">
+          <div v-for="h in filteredHazards" :key="h.id" class="hazard-card"
+               :class="{ selected: selectedId === h.id, red: h.redFlag }"
+               @click="selectHazard(h.id)" @dblclick="openDetail(h.id)">
+            <div class="hc-top">
+              <span class="hc-code">{{ h.code }}</span>
+              <span class="tag" :style="{ background: riskMeta[h.riskLevel].color }">{{ h.riskLevel }}</span>
+              <span class="tag tag-status" :class="'st-' + statusKey(h.status)">{{ h.status }}</span>
+              <span v-if="h.redFlag" class="tag tag-redflag">⚠ 红色复核</span>
+            </div>
+            <div class="hc-name">{{ h.name }}（{{ h.type }}）</div>
+            <div class="hc-meta">
+              {{ h.township }} · 坡度 {{ h.slopeDeg }}° · 坡高 {{ h.slopeHeight }}m ·
+              汇水 {{ h.catchArea }}m² · {{ h.households }}户/{{ h.persons }}人
+            </div>
+          </div>
+          <div v-if="!filteredHazards.length" class="empty">暂无符合条件的隐患点</div>
+        </div>
+      </aside>
+      <div class="map-legend">
+        <div class="legend-title">图例</div>
+        <div class="legend-row"><i class="lg lg-contour"></i>等高线（细10m / 粗50m）</div>
+        <div class="legend-row"><i class="lg lg-flow"></i>汇水线（D8 流向累积）</div>
+        <div class="legend-row"><i class="lg lg-house"></i>民房</div>
+        <div class="legend-row"><i class="lg lg-red"></i>陡坡＞35°+下方10m民房</div>
+        <div class="legend-slope" v-if="colorMode === 'slope'">
+          <div class="legend-title">坡度分级</div>
+          <div class="slope-bar"></div>
+          <div class="slope-scale"><span>0°</span><span>15</span><span>25</span><span>35</span><span>45°+</span></div>
+        </div>
+      </div>
+      <div class="map-scale">比例尺 1:2000 · 网格 600m×600m</div>
+    </div>
+  </section>
+
+  <!-- ============ 视图2：审核工单 ============ -->
+  <section v-show="view === 'review'" class="view review-view">
+    <div class="page-head">
+      <h2>审核工单</h2>
+      <p>审核员对调查员提交的隐患点进行退回补证或确认派单；红色预警点须附现场复核记录。</p>
+    </div>
+    <div class="review-cols">
+      <div class="card review-list-card">
+        <div class="card-head">
+          待办工单
+          <div class="seg">
+            <button :class="{on: reviewTab==='todo'}" @click="reviewTab='todo'">待办（{{ reviewTodo.length }}）</button>
+            <button :class="{on: reviewTab==='done'}" @click="reviewTab='done'">已办（{{ reviewDone.length }}）</button>
+          </div>
+        </div>
+        <div class="work-order-list">
+          <div v-for="h in reviewTab==='todo' ? reviewTodo : reviewDone" :key="h.id"
+               class="wo-item" :class="{ active: selectedId === h.id, red: h.redFlag }"
+               @click="selectHazard(h.id)">
+            <div class="wo-top">
+              <strong>{{ h.code }}</strong>
+              <span class="tag" :style="{ background: riskMeta[h.riskLevel].color }">{{ h.riskLevel }}</span>
+              <span class="tag tag-status" :class="'st-' + statusKey(h.status)">{{ h.status }}</span>
+            </div>
+            <div class="wo-name">{{ h.name }} · {{ h.township }} · {{ h.type }}</div>
+            <div class="wo-meta">
+              <span>坡度 {{ h.slopeDeg }}°</span><span>汇水 {{ h.catchArea }}m²</span>
+              <span>{{ h.households }}户</span><span>{{ h.soilType }}</span>
+            </div>
+            <div v-if="h.redFlag" class="wo-alert">⚠ 坡度超35°且下方10m内有 {{ h.nearHouses.length }} 栋民房，须复核确认</div>
+          </div>
+          <div v-if="!(reviewTab==='todo' ? reviewTodo : reviewDone).length" class="empty">暂无工单</div>
+        </div>
+      </div>
+      <div class="card review-detail-card" v-if="selected">
+        <detail-drawer :h="selected" :role="role" :cycle="approveCycle"
+                       @update:cycle="v => approveCycle = v"
+                       :scene-ready="!!scene"
+                       @close="selectedId = null"
+                       @edit="openEditForm"
+                       @recheck="confirmRedRecheck"
+                       @submit="submitForReview"
+                       @resubmit="resubmitSupplements"
+                       @return="openReturn"
+                       @approve="approve"
+                       @resolve="resolveRecheck"
+                       @closehz="closeHazard"
+                       @checkin="openCheckinFromDetail"></detail-drawer>
+      </div>
+      <div class="card review-detail-card placeholder-card" v-else>
+        <div class="empty big">← 选择左侧工单查看详情</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 视图3：巡查打卡 ============ -->
+  <section v-show="view === 'patrol'" class="view patrol-view">
+    <div class="page-head">
+      <h2>巡查打卡工单</h2>
+      <p>按 7 天 / 15 天周期执行巡查，上报裂缝变化与警示牌状态；新增裂缝附现场照片并自动触发复核。</p>
+    </div>
+    <div class="patrol-grid">
+      <div class="card" v-for="h in patrolList" :key="h.id"
+           :class="{ 'card-red': isOverdue(h), 'card-warn': h.status === '待复核' }">
+        <div class="pat-card-head">
+          <div>
+            <strong>{{ h.code }} {{ h.name }}</strong>
+            <span class="tag tag-status" :class="'st-' + statusKey(h.status)">{{ h.status }}</span>
+          </div>
+          <span class="cycle-tag">周期 {{ h.patrolCycle }} 天</span>
+        </div>
+        <div class="pat-card-meta">
+          <span>{{ h.township }}</span>
+          <span :class="{ overdue: isOverdue(h) }">下次巡查：{{ h.nextDueAt }} {{ isOverdue(h) ? '（已逾期）' : '' }}</span>
+          <span>已打卡 {{ h.patrols.length }} 次</span>
+        </div>
+        <div class="pat-card-actions">
+          <button class="btn primary" @click="openCheckin(h.id)">巡查打卡</button>
+          <button class="btn" @click="selectHazard(h.id); switchView('review')">查看档案</button>
+        </div>
+        <div v-if="h.patrols.length" class="pat-last">
+          最近：{{ h.patrols[0].at }} · {{ h.patrols[0].newCrack ? '⚠ 新增裂缝' : h.patrols[0].crackStatus }}
+        </div>
+      </div>
+      <div v-if="!patrolList.length" class="empty big">当前没有已确认的巡查任务</div>
+    </div>
+  </section>
+
+  <!-- ============ 视图4：汇总看板 ============ -->
+  <section v-show="view === 'dashboard'" class="view dashboard-view">
+    <div class="page-head">
+      <h2>群测群防汇总看板</h2>
+      <p>按乡镇汇总隐患点数量、威胁人数与逾期巡查，实时掌握全县防控态势。</p>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi kpi-blue"><div class="kpi-num">{{ dash.totals.hazards }}</div><div class="kpi-label">在册隐患点</div></div>
+      <div class="kpi kpi-red"><div class="kpi-num">{{ dash.totals.red }}</div><div class="kpi-label">红色预警点</div></div>
+      <div class="kpi kpi-orange"><div class="kpi-num">{{ dash.totals.persons }}</div><div class="kpi-label">威胁人数</div></div>
+      <div class="kpi kpi-purple"><div class="kpi-num">{{ dash.totals.overdue }}</div><div class="kpi-label">逾期巡查</div></div>
+      <div class="kpi kpi-green"><div class="kpi-num">{{ dash.totals.review + dash.totals.recheck }}</div><div class="kpi-label">待审核/复核</div></div>
+    </div>
+    <div class="chart-row">
+      <div class="card chart-card"><div ref="chartTown" class="chart-box"></div></div>
+      <div class="card chart-card"><div ref="chartRisk" class="chart-box"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head">分乡镇统计台账</div>
+      <table class="table">
+        <thead><tr><th>乡镇</th><th>隐患点数</th><th>高风险</th><th>威胁人数</th><th>逾期巡查</th><th>待核查/复核</th></tr></thead>
+        <tbody>
+          <tr v-for="r in dash.rows" :key="r.township">
+            <td>{{ r.township }}</td><td>{{ r.total }}</td>
+            <td><span :class="{ 'text-red': r.high > 0 }">{{ r.high }}</span></td>
+            <td>{{ r.persons }}</td>
+            <td><span :class="{ 'text-red': r.overdue > 0 }">{{ r.overdue }}</span></td>
+            <td>{{ r.pending }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 视图5：台账与明白卡 ============ -->
+  <section v-show="view === 'ledger'" class="view ledger-view">
+    <div class="page-head">
+      <h2>群测群防台账 · 撤离明白卡</h2>
+      <p>导出全县群测群防台账（CSV），逐点生成并打印撤离明白卡。</p>
+      <div class="head-actions">
+        <button class="btn primary" @click="exportCSV">⬇ 导出台账 CSV</button>
+      </div>
+    </div>
+    <div class="card">
+      <table class="table table-hover">
+        <thead><tr>
+          <th>编号</th><th>名称</th><th>类型</th><th>乡镇</th><th>风险</th><th>坡度/坡高</th>
+          <th>威胁</th><th>红色预警</th><th>状态</th><th>撤离路线</th><th>操作</th>
+        </tr></thead>
+        <tbody>
+          <tr v-for="h in hazards" :key="h.id">
+            <td>{{ h.code }}</td><td>{{ h.name }}</td><td>{{ h.type }}</td><td>{{ h.township }}</td>
+            <td><span class="tag" :style="{ background: riskMeta[h.riskLevel].color }">{{ h.riskLevel }}</span></td>
+            <td>{{ h.slopeDeg }}° / {{ h.slopeHeight }}m</td>
+            <td>{{ h.households }}户 {{ h.persons }}人</td>
+            <td><span v-if="h.redFlag" class="text-red">⚠ 是</span><span v-else>否</span></td>
+            <td><span class="tag tag-status" :class="'st-' + statusKey(h.status)">{{ h.status }}</span></td>
+            <td class="cell-route">{{ h.evacuationRoute || '—' }}</td>
+            <td><button class="btn btn-mini" @click="openCard(h.id)">明白卡</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 隐患点详情弹窗（全局面板） -->
+  <detail-modal v-if="detailVisible && selected" :h="selected" :role="role" :cycle="approveCycle"
+                @update:cycle="v => approveCycle = v"
+                @close="detailVisible = false"
+                @edit="openEditForm"
+                @recheck="confirmRedRecheck"
+                @submit="submitForReview"
+                @resubmit="resubmitSupplements"
+                @return="openReturn"
+                @approve="approve"
+                @resolve="resolveRecheck"
+                @closehz="closeHazard"
+                @checkin="openCheckinFromDetail"></detail-modal>
+
+  <!-- 圈定录入弹窗 -->
+  <div v-if="formVisible" class="modal-mask" @click.self="cancelForm">
+    <div class="modal modal-lg">
+      <div class="modal-head">隐患点判读录入 <span class="modal-sub" v-if="liveEval">实测坡度 {{ liveEval.slope }}° · 汇水面积 {{ liveEval.catchArea }}m² · 面积 {{ liveEval.area }}m²</span></div>
+      <div class="modal-body">
+        <div v-if="liveEval && liveEval.redFlag" class="alert alert-red">
+          ⚠ 自动预警：该点坡度 <b>{{ liveEval.slope }}°</b>（＞35°），且坡体下方 10m 内存在
+          <b>{{ liveEval.nearHouses.length }}</b> 栋民房（{{ liveEval.nearHouses.join('、') }}），
+          系统已标红。提交审核前须由调查员完成现场复核确认。
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>隐患名称 *</span><input v-model="hform.name" class="input" placeholder="如：青溪镇后山坡滑坡隐患点"></label>
+          <label class="field"><span>灾害类型 *</span>
+            <select v-model="hform.type" class="input"><option v-for="t in TYPES" :key="t">{{ t }}</option></select>
+          </label>
+          <label class="field"><span>所属乡镇 *</span>
+            <select v-model="hform.township" class="input"><option v-for="t in TOWNSHIPS" :key="t">{{ t }}</option></select>
+          </label>
+          <label class="field"><span>威胁户数 *</span><input v-model.number="hform.households" type="number" min="0" class="input"></label>
+          <label class="field"><span>坡高 (m) *</span><input v-model.number="hform.slopeHeight" type="number" min="1" class="input"></label>
+          <label class="field"><span>坡度 (°) *</span><input v-model.number="hform.slopeDeg" type="number" class="input"></label>
+          <label class="field"><span>汇水面积 (m²)</span><input v-model.number="hform.catchArea" type="number" class="input"></label>
+          <label class="field"><span>岩土类型 *</span>
+            <select v-model="hform.soilType" class="input"><option v-for="s in SOIL_TYPES" :key="s">{{ s }}</option></select>
+          </label>
+        </div>
+        <div class="risk-preview">
+          自动评级：<b :style="{ color: riskMeta[formRisk.level].color }">{{ formRisk.level }}（{{ formRisk.score }}分）</b>
+          <span class="hint">按坡度、汇水面积、威胁户数与岩土类型综合评分</span>
+        </div>
+        <photo-upload :photos="hform.photos" @add="onPhotoAdd" @remove="i => hform.photos.splice(i,1)"></photo-upload>
+        <label class="field field-full"><span>撤离路线（可在审核后补充）</span>
+          <input v-model="hform.evacuationRoute" class="input" placeholder="如：沿村道向南撤至中心小学安置点">
+        </label>
+        <label v-if="liveEval && liveEval.redFlag" class="chk recheck-chk">
+          <input type="checkbox" v-model="hform.recheckConfirmed">
+          我已到现场复核：陡坡下方民房（{{ liveEval.nearHouses.join('、') }}）风险属实，已告知住户并采取临时防范措施
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" @click="cancelForm">取消</button>
+        <button class="btn primary" @click="submitForm">保存隐患点</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 巡查打卡弹窗 -->
+  <div v-if="checkinVisible" class="modal-mask" @click.self="checkinVisible = false">
+    <div class="modal">
+      <div class="modal-head">巡查打卡 · {{ checkinTarget && checkinTarget.code }}</div>
+      <div class="modal-body">
+        <label class="field"><span>裂缝变化情况 *</span>
+          <textarea v-model="checkinForm.crackStatus" class="input" rows="2" placeholder="如：原有裂缝宽度稳定（3mm），无新增裂缝"></textarea>
+        </label>
+        <label class="field"><span>警示牌状态 *</span>
+          <select v-model="checkinForm.signStatus" class="input">
+            <option>警示牌完好</option><option>警示牌轻微倾斜</option><option>警示牌损毁缺失</option>
+          </select>
+        </label>
+        <label class="chk"><input type="checkbox" v-model="checkinForm.newCrack"> 发现新增裂缝（须附现场照片并触发复核流程）</label>
+        <photo-upload :photos="checkinForm.photos" @add="onCheckinPhotoAdd" @remove="i => checkinForm.photos.splice(i,1)"></photo-upload>
+        <div v-if="checkinForm.newCrack && !checkinForm.photos.length" class="alert alert-orange">新增裂缝必须至少上传 1 张现场照片</div>
+        <label class="field"><span>备注</span><input v-model="checkinForm.note" class="input" placeholder="雨情、排水、警戒线等情况"></label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" @click="checkinVisible = false">取消</button>
+        <button class="btn primary" @click="submitCheckin">提交打卡</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 审核退回弹窗 -->
+  <div v-if="returnVisible" class="modal-mask" @click.self="returnVisible = false">
+    <div class="modal">
+      <div class="modal-head">审核退回</div>
+      <div class="modal-body">
+        <div class="alert alert-orange">退回后调查员需补充现场照片与撤离路线，再重新提交审核。</div>
+        <label class="field"><span>退回意见 *</span>
+          <textarea v-model="returnReason" class="input" rows="3" placeholder="如：缺少坡脚照片，未标注撤离路线"></textarea>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" @click="returnVisible = false">取消</button>
+        <button class="btn btn-danger" @click="confirmReturn">确认退回</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 撤离明白卡弹窗 -->
+  <div v-if="cardVisible" class="modal-mask">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        地质灾害避险撤离明白卡
+        <div class="modal-foot-inline">
+          <button class="btn btn-mini" @click="printCard">打印 / 另存PDF</button>
+          <button class="btn btn-mini" @click="cardVisible = false">关闭</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="mingbai" ref="cardEl">
+          <h2 class="mb-title">地质灾害避险撤离明白卡</h2>
+          <div class="mb-sub">{{ cardH && cardH.township }}群测群防点 · 编号 {{ cardH && cardH.code }}</div>
+          <table class="mb-table" v-if="cardH">
+            <tbody>
+              <tr><td class="mb-k">隐患点名称</td><td>{{ cardH.name }}（{{ cardH.type }}）</td><td class="mb-k">风险等级</td><td>{{ cardH.riskLevel }}（{{ cardH.riskScore }}分）</td></tr>
+              <tr><td class="mb-k">位置参数</td><td colspan="3">坡度 {{ cardH.slopeDeg }}° · 坡高 {{ cardH.slopeHeight }}m · 汇水面积 {{ cardH.catchArea }}m² · {{ cardH.soilType }}</td></tr>
+              <tr><td class="mb-k">威胁对象</td><td>{{ cardH.households }} 户 / {{ cardH.persons }} 人<span v-if="cardH.redFlag">（⚠ 陡坡下方10m内民房）</span></td><td class="mb-k">监测周期</td><td>每 {{ cardH.patrolCycle || 7 }} 天巡查一次</td></tr>
+              <tr><td class="mb-k">撤离路线</td><td colspan="3" class="mb-route">{{ cardH.evacuationRoute || '待审核确认后补充（请沿村道向上风、上坡方向撤至就近安置点）' }}</td></tr>
+              <tr><td class="mb-k">撤离信号</td><td colspan="3">铜锣长鸣 + 应急广播 + 村干部逐户通知；接到信号后立即撤离，不贪恋财物</td></tr>
+              <tr><td class="mb-k">避险要点</td><td colspan="3">① 连续降雨、暴雨期间提高警惕；② 发现泉水突涨、掉块、新增裂缝立即报告并撤离；③ 撤离时两侧绕行，勿沿沟谷上下；④ 未解除警报前不得返回</td></tr>
+              <tr><td class="mb-k">责任人员</td><td colspan="3">调查员：王调查　审核员：李审核　乡镇巡查员：张巡查　报警电话：110 / 12350</td></tr>
+            </tbody>
+          </table>
+          <div class="mb-foot">发卡单位：县地质灾害防治办公室　　发卡日期：{{ today }}　　住户签收：__________</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 轻提示 -->
+  <transition name="toast">
+    <div v-if="toast.msg" class="toast" :class="toast.type">{{ toast.msg }}</div>
+  </transition>
+</div>
+
+<script src="js/geo-scene.js"></script>
+<script src="js/geo-store.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
