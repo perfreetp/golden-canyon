@@ -1,0 +1,702 @@
+<title>山地果园单轨运输机线路规划与施工验收系统</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root{
+  --bg:#f4f6f1; --panel:#ffffff; --fg:#22301f; --muted:#6b7a66; --line:#d8dfd2;
+  --accent:#2e7d32; --accent-soft:#e3f0e3; --danger:#c62828; --danger-soft:#fbe4e4;
+  --warn:#e65100; --warn-soft:#fff0e0; --ok:#1b5e20; --ok-soft:#e2f2e4;
+  --chip:#eef2ea; --mono:ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#161a15; --panel:#1f241e; --fg:#e4eadf; --muted:#93a08d; --line:#333b31;
+  --accent:#66bb6a; --accent-soft:#243526; --danger:#ef5350; --danger-soft:#3a2222;
+  --warn:#ffb74d; --warn-soft:#3a2f1e; --ok:#81c784; --ok-soft:#22331f;
+  --chip:#2a3028; color-scheme:dark; }}
+:root[data-theme="dark"]{
+  --bg:#161a15; --panel:#1f241e; --fg:#e4eadf; --muted:#93a08d; --line:#333b31;
+  --accent:#66bb6a; --accent-soft:#243526; --danger:#ef5350; --danger-soft:#3a2222;
+  --warn:#ffb74d; --warn-soft:#3a2f1e; --ok:#81c784; --ok-soft:#22331f;
+  --chip:#2a3028; color-scheme:dark; }
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+.app{max-width:1420px;margin:0 auto;padding:12px max(16px,env(safe-area-inset-left,0px)) 40px}
+header.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+h1{font-size:19px;margin:0}
+.sub{color:var(--muted);font-size:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 14px}
+.tabs button{padding:8px 16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;cursor:pointer;font-size:14px}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.layout{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.side{width:340px;min-width:280px;flex:0 1 340px;display:flex;flex-direction:column;gap:10px}
+.main{flex:1 1 600px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card h3{margin:0 0 8px;font-size:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+label.fl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+input,select,textarea{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px}
+button.act{padding:6px 12px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;cursor:pointer;font-size:13px}
+button.ghost{background:var(--panel);color:var(--accent)}
+button.dng{background:var(--danger);border-color:var(--danger)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.sm{padding:3px 8px;font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600}
+.b-草稿{background:var(--chip);color:var(--muted)}
+.b-待审核{background:var(--warn-soft);color:var(--warn)}
+.b-施工中{background:#e3ecfb;color:#1565c0}
+.b-已验收{background:var(--ok-soft);color:var(--ok)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px}
+.kv b{text-align:right;font-family:var(--mono)}
+.warn-item{background:var(--danger-soft);color:var(--danger);border-radius:6px;padding:6px 9px;font-size:12px;margin-top:6px}
+.hint{color:var(--muted);font-size:12px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left}
+th{background:var(--chip);font-weight:600;white-space:nowrap}
+td input,td select{width:100%;box-sizing:border-box;padding:4px 6px}
+.tbl-wrap{overflow-x:auto}
+.canvas-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#e9efe2}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.stat .v{font-size:20px;font-weight:700;font-family:var(--mono)}
+.stat .k{color:var(--muted);font-size:12px}
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal{background:var(--panel);border-radius:10px;padding:16px;max-width:820px;width:100%;max-height:85vh;display:flex;flex-direction:column;gap:10px}
+.modal textarea{flex:1;min-height:300px;font-family:var(--mono);font-size:12px;white-space:pre}
+.tag{display:inline-block;background:var(--chip);border-radius:4px;padding:1px 6px;font-size:11px;margin-right:4px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.sw{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+img.thumb{width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--line)}
+.modebar button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+</style>
+
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+const {useState,useEffect,useMemo,useRef}=React;
+
+/* ================= 常量与地形 ================= */
+const MAP_W=1000, MAP_H=700;            // 地图尺寸（1px = 1m）
+const SEG_LEN=50;                       // 施工分段长度 m
+const DS=2;                             // 高程采样间隔 m
+const MAX_SLOPE=35;                     // 坡度限值 °
+const MIN_R=4;                          // 最小转弯半径 m
+const TRACK_HALF=1.2;                   // 轨道占行半宽 m
+const PRICE={rail:120,column:60,bolt:3,concrete:400,tree:200}; // 单价：元/m、元/根、元/个、元/m³、元/株
+const AREAS=['东坡片区','西坡片区','南洼片区','北岭片区'];
+const STATUS=['草稿','待审核','施工中','已验收'];
+const FLOW={
+  '草稿':[['提交审核','待审核']],
+  '待审核':[['审核通过','施工中'],['退回修改','草稿']],
+  '施工中':[['整线验收通过','已验收'],['变更退回','待审核']],
+  '已验收':[['发起变更','施工中']],
+};
+const HILLS=[{x:280,y:200,a:110,r:150},{x:700,y:260,a:160,r:120},{x:500,y:580,a:80,r:120},{x:880,y:540,a:60,r:100},{x:130,y:540,a:50,r:90}];
+const ORCHARDS=[{x:60,y:80,w:380,h:260},{x:520,y:90,w:420,h:300},{x:120,y:420,w:360,h:230},{x:560,y:440,w:380,h:220}];
+
+function elev(x,y){
+  let e=8+0.05*(MAP_H-y);
+  for(const h of HILLS){const dx=x-h.x,dy=y-h.y;e+=h.a*Math.exp(-(dx*dx+dy*dy)/(2*h.r*h.r));}
+  return e;
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const TREES=(()=>{ // 果树（株行距 4m×6m，加抖动）
+  const rnd=mulberry32(20261115),ts=[];
+  for(const o of ORCHARDS)for(let y=o.y+4;y<o.y+o.h-2;y+=6)for(let x=o.x+3;x<o.x+o.w-2;x+=4)
+    ts.push({x:x+(rnd()-0.5)*1.6,y:y+(rnd()-0.5)*1.6});
+  return ts;
+})();
+
+/* ================= 几何/分析 ================= */
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function polyLen(pts){let L=0;for(let i=1;i<pts.length;i++)L+=dist(pts[i-1],pts[i]);return L;}
+function pointAt(pts,s){
+  let acc=0;
+  for(let i=1;i<pts.length;i++){
+    const a=pts[i-1],b=pts[i],d=dist(a,b);
+    if(acc+d>=s&&d>0){const t=(s-acc)/d;return{x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};}
+    acc+=d;
+  }
+  const p=pts[pts.length-1];return{x:p.x,y:p.y};
+}
+function nearestS(pts,p){
+  let best={d:1e9,s:0},acc=0;
+  for(let i=1;i<pts.length;i++){
+    const a=pts[i-1],b=pts[i],dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy,L=Math.sqrt(L2);
+    if(L2===0)continue;
+    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;t=Math.max(0,Math.min(1,t));
+    const q={x:a.x+dx*t,y:a.y+dy*t},d=dist(p,q);
+    if(d<best.d)best={d,s:acc+L*t};
+    acc+=L;
+  }
+  return best;
+}
+function circumR(a,b,c){
+  const ab=dist(a,b),bc=dist(b,c),ca=dist(c,a);
+  const K=Math.abs((b.x-a.x)*(c.y-a.y)-(c.x-a.x)*(b.y-a.y))/2;
+  return K<0.01?Infinity:ab*bc*ca/(4*K);
+}
+function analyze(pts){
+  if(!pts||pts.length<2)return null;
+  const len=polyLen(pts);
+  const n=Math.max(2,Math.round(len/DS)+1),ds=len/(n-1);
+  const samples=[],E=[];
+  for(let i=0;i<n;i++){const p=pointAt(pts,i*ds);samples.push({...p,s:i*ds});E.push(elev(p.x,p.y));}
+  const slopes=[];
+  for(let i=1;i<n;i++)slopes.push({s:(i-0.5)*ds,deg:Math.atan2(E[i]-E[i-1],ds)*180/Math.PI,i0:i-1,i1:i});
+  const maxSlope=slopes.reduce((m,s)=>Math.max(m,Math.abs(s.deg)),0);
+  // 最长同向连续坡长
+  let maxCont=0,run=0,sign=0;
+  for(const sl of slopes){const sg=Math.sign(sl.deg)||sign||1;
+    if(sg===sign)run+=ds;else{run=ds;sign=sg;}
+    maxCont=Math.max(maxCont,run);}
+  // 超限坡段（>35°）
+  const red=[];let cur=null;
+  for(const sl of slopes){
+    if(Math.abs(sl.deg)>MAX_SLOPE){
+      if(!cur)cur={s0:sl.s-ds/2,s1:sl.s+ds/2,max:Math.abs(sl.deg)};
+      else{cur.s1=sl.s+ds/2;cur.max=Math.max(cur.max,Math.abs(sl.deg));}
+    }else if(cur){red.push(cur);cur=null;}
+  }
+  if(cur)red.push(cur);
+  // 转弯半径
+  const badVerts=[];let acc=0;const vS=[0];
+  for(let i=1;i<pts.length;i++){acc+=dist(pts[i-1],pts[i]);vS.push(acc);}
+  for(let i=1;i<pts.length-1;i++){
+    const R=circumR(pts[i-1],pts[i],pts[i+1]);
+    if(R<MIN_R)badVerts.push({i,R,s:vS[i]});
+  }
+  // 分段
+  const segs=[];const cnt=Math.max(1,Math.ceil(len/SEG_LEN-1e-6));
+  for(let k=0;k<cnt;k++){
+    const s0=k*SEG_LEN,s1=Math.min(len,(k+1)*SEG_LEN);
+    const ms=slopes.filter(sl=>sl.s>=s0&&sl.s<=s1).reduce((m,sl)=>Math.max(m,Math.abs(sl.deg)),0);
+    const mr=badVerts.filter(v=>v.s>=s0&&v.s<=s1).reduce((m,v)=>Math.min(m,v.R),Infinity);
+    segs.push({idx:k,s0,s1,len:s1-s0,maxSlope:ms,minR:mr});
+  }
+  // 占用果树
+  const bb={x0:1e9,y0:1e9,x1:-1e9,y1:-1e9};
+  pts.forEach(p=>{bb.x0=Math.min(bb.x0,p.x);bb.y0=Math.min(bb.y0,p.y);bb.x1=Math.max(bb.x1,p.x);bb.y1=Math.max(bb.y1,p.y);});
+  const occ=[];
+  for(let ti=0;ti<TREES.length;ti++){const t=TREES[ti];
+    if(t.x<bb.x0-3||t.x>bb.x1+3||t.y<bb.y0-3||t.y>bb.y1+3)continue;
+    if(nearestS(pts,t).d<TRACK_HALF)occ.push(ti);
+  }
+  return{len,samples,slopes,maxSlope,maxCont,red,badVerts,segs,occupied:occ};
+}
+function transportCalc(distM,maxSlope){
+  const rated=400; // 额定载重 kg
+  const load=Math.round(rated*Math.max(0.35,1-maxSlope/50));
+  const v=1.0*Math.max(0.4,1-maxSlope/60); // 平均速度 m/s
+  const tMin=distM>0?(2*distM/v)/60+10:0; // 往返 + 装卸10min
+  return{load,v,tMin};
+}
+function investOf(line,an){
+  let c=0,b=0,con=0;
+  Object.values(line.orders||{}).forEach(o=>{c+=+o.columns||0;b+=+o.bolts||0;con+=+o.concrete||0;});
+  const rail=(an?an.len:0)*PRICE.rail, tree=(an?an.occupied.length:0)*PRICE.tree;
+  const total=rail+c*PRICE.column+b*PRICE.bolt+con*PRICE.concrete+tree;
+  return{c,b,con,rail,tree,total};
+}
+const fmt=(n,d=1)=>n.toFixed(d);
+const km=s=>`K${Math.floor(s/1000)}+${String(Math.round(s%1000)).padStart(3,'0')}`;
+const yuan=n=>n>=10000?(n/10000).toFixed(2)+' 万元':Math.round(n)+' 元';
+const nowStr=()=>{const d=new Date();const p=x=>String(x).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;};
+const uid=()=> 'L'+Math.random().toString(36).slice(2,8);
+
+/* ================= 地形底图（离屏缓存） ================= */
+function buildTerrain(){
+  const c=document.createElement('canvas');c.width=MAP_W;c.height=MAP_H;
+  const g=c.getContext('2d');
+  const cell=4,nx=MAP_W/cell,ny=MAP_H/cell,E=[];
+  let mn=1e9,mx=-1e9;
+  for(let j=0;j<=ny;j++){E.push([]);for(let i=0;i<=nx;i++){const e=elev(i*cell,j*cell);E[j].push(e);mn=Math.min(mn,e);mx=Math.max(mx,e);}}
+  const col=t=>{
+    const lerp=(a,b,u)=>a+(b-a)*u;
+    let r,gg,b;
+    if(t<0.55){const u=t/0.55;r=lerp(228,199,u);gg=lerp(241,222,u);b=lerp(213,158,u);}
+    else{const u=(t-0.55)/0.45;r=lerp(199,168,u);gg=lerp(222,140,u);b=lerp(158,96,u);}
+    return `rgb(${r|0},${gg|0},${b|0})`;
+  };
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+    const t=(E[j][i]+E[j][i+1]+E[j+1][i]+E[j+1][i+1])/4;
+    g.fillStyle=col((t-mn)/(mx-mn));g.fillRect(i*cell,j*cell,cell+0.6,cell+0.6);
+  }
+  // 等高线
+  for(let lv=Math.ceil(mn/5)*5;lv<mx;lv+=5){
+    const major=lv%25===0;
+    g.strokeStyle=major?'rgba(110,80,40,.65)':'rgba(120,90,50,.35)';
+    g.lineWidth=major?1.2:0.6;g.beginPath();
+    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+      const a=E[j][i],b=E[j][i+1],cc=E[j+1][i+1],d=E[j+1][i];
+      let idx=0;if(a>lv)idx|=8;if(b>lv)idx|=4;if(cc>lv)idx|=2;if(d>lv)idx|=1;
+      if(idx===0||idx===15)continue;
+      const x=i*cell,y=j*cell,L=(v0,v1)=>(lv-v0)/(v1-v0);
+      const top=[x+cell*L(a,b),y],rgt=[x+cell,y+cell*L(b,cc)],bot=[x+cell*L(d,cc),y+cell],lft=[x,y+cell*L(a,d)];
+      const seg=(p,q)=>{g.moveTo(p[0],p[1]);g.lineTo(q[0],q[1]);};
+      switch(idx){
+        case 1:case 14:seg(lft,bot);break;case 2:case 13:seg(bot,rgt);break;
+        case 3:case 12:seg(lft,rgt);break;case 4:case 11:seg(top,rgt);break;
+        case 6:case 9:seg(top,bot);break;case 7:case 8:seg(lft,top);break;
+        case 5:seg(lft,top);seg(bot,rgt);break;case 10:seg(top,rgt);seg(lft,bot);break;
+      }
+    }
+    g.stroke();
+  }
+  // 果园边界与果树
+  g.strokeStyle='rgba(46,110,46,.5)';g.setLineDash([5,4]);
+  for(const o of ORCHARDS)g.strokeRect(o.x,o.y,o.w,o.h);
+  g.setLineDash([]);
+  g.fillStyle='rgba(38,100,38,.75)';
+  for(const t of TREES){g.beginPath();g.arc(t.x,t.y,1.3,0,7);g.fill();}
+  return c;
+}
+
+/* ================= 地图画布 ================= */
+function MapCanvas({line,otherLines,analysis,mode,editable,onAct}){
+  const ref=useRef(null),bgRef=useRef(null),dragRef=useRef(-1);
+  const[hover,setHover]=useState(null);
+  if(!bgRef.current)bgRef.current=buildTerrain();
+  const pts=line?line.points:[];
+
+  useEffect(()=>{
+    const cv=ref.current,dpr=window.devicePixelRatio||1;
+    cv.width=MAP_W*dpr;cv.height=MAP_H*dpr;
+    const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+    g.drawImage(bgRef.current,0,0);
+    // 其他线路
+    g.lineWidth=2;g.strokeStyle='rgba(90,90,130,.5)';
+    for(const ol of otherLines){if(ol.points.length<2)continue;g.beginPath();
+      ol.points.forEach((p,i)=>i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y));g.stroke();}
+    if(analysis){
+      // 分段刻度与编号
+      g.font='10px sans-serif';g.fillStyle='#5a6b52';
+      for(const sg of analysis.segs){const p=pointAt(pts,sg.s0);
+        g.beginPath();g.arc(p.x,p.y,2,0,7);g.fill();
+        g.fillText('S'+(sg.idx+1),p.x+4,p.y-4);}
+      // 轨道线
+      g.lineWidth=4;g.strokeStyle='rgba(255,255,255,.85)';
+      g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y));g.stroke();
+      g.lineWidth=2.4;g.strokeStyle='#1565c0';
+      g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y));g.stroke();
+      // 超限坡段标红
+      g.lineWidth=5;g.strokeStyle='rgba(214,48,49,.9)';
+      for(const r of analysis.red){
+        g.beginPath();
+        for(let s=r.s0;s<=r.s1;s+=DS){const p=pointAt(pts,s);s===r.s0?g.moveTo(p.x,p.y):g.lineTo(p.x,p.y);}
+        const p=pointAt(pts,r.s1);g.lineTo(p.x,p.y);g.stroke();
+      }
+      // 小半径顶点标红
+      for(const v of analysis.badVerts){const p=pts[v.i];
+        g.beginPath();g.arc(p.x,p.y,7,0,7);g.fillStyle='rgba(214,48,49,.35)';g.fill();
+        g.lineWidth=2;g.strokeStyle='#d63031';g.stroke();
+        g.fillStyle='#d63031';g.font='bold 10px sans-serif';
+        g.fillText('R'+v.R.toFixed(1)+'m',p.x+9,p.y+3);}
+      // 占用果树
+      g.fillStyle='#e65100';
+      for(const ti of analysis.occupied){const t=TREES[ti];
+        g.beginPath();g.arc(t.x,t.y,2.6,0,7);g.fill();}
+      // 装卸点
+      const st=line.stations||{};
+      const mark=(s,txt,color)=>{if(s==null)return;const p=pointAt(pts,s);
+        g.beginPath();g.arc(p.x,p.y,8,0,7);g.fillStyle=color;g.fill();
+        g.lineWidth=2;g.strokeStyle='#fff';g.stroke();
+        g.fillStyle='#fff';g.font='bold 10px sans-serif';g.textAlign='center';g.fillText(txt,p.x,p.y+3.5);g.textAlign='left';};
+      mark(st.load,'装','#2e7d32');mark(st.unload,'卸','#6a1b9a');
+    }else if(pts.length){
+      g.lineWidth=2.4;g.strokeStyle='#1565c0';g.beginPath();
+      pts.forEach((p,i)=>i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y));g.stroke();
+    }
+    // 顶点手柄
+    if(editable){g.fillStyle='#fff';g.strokeStyle='#1565c0';g.lineWidth=1.5;
+      pts.forEach(p=>{g.beginPath();g.arc(p.x,p.y,4.5,0,7);g.fill();g.stroke();});}
+    // 比例尺
+    g.fillStyle='rgba(0,0,0,.6)';g.fillRect(MAP_W-130,MAP_H-22,100,4);
+    g.font='11px sans-serif';g.fillText('100 m',MAP_W-100,MAP_H-28);
+  });
+
+  const toM=e=>{const r=ref.current.getBoundingClientRect();
+    return{x:(e.clientX-r.left)*MAP_W/r.width,y:(e.clientY-r.top)*MAP_H/r.height};};
+  const down=e=>{
+    if(!line)return;const p=toM(e);
+    if(mode==='draw'&&editable){onAct({type:'add',p});return;}
+    if(mode==='load'||mode==='unload'){
+      if(pts.length<2)return;
+      const n=nearestS(pts,p);if(n.d<40)onAct({type:mode,s:n.s});return;}
+    if(mode==='edit'&&editable){
+      let bi=-1,bd=64;
+      pts.forEach((q,i)=>{const d=(q.x-p.x)**2+(q.y-p.y)**2;if(d<bd){bd=d;bi=i;}});
+      if(e.button===2){if(bi>=0)onAct({type:'del',i:bi});return;}
+      dragRef.current=bi;
+    }
+  };
+  const move=e=>{const p=toM(e);setHover(p);
+    if(dragRef.current>=0)onAct({type:'move',i:dragRef.current,p});};
+  const up=()=>{dragRef.current=-1;};
+  return <div>
+    <div className="canvas-wrap">
+      <canvas ref={ref} style={{width:MAP_W,height:MAP_H,display:'block',cursor:mode==='draw'?'crosshair':'default'}}
+        onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
+        onContextMenu={e=>e.preventDefault()}/>
+    </div>
+    <div className="legend">
+      <span><span className="sw" style={{background:'#1565c0'}}></span>轨道走向</span>
+      <span><span className="sw" style={{background:'#d63031'}}></span>超限路段（坡度&gt;35° 或 转弯半径&lt;4m）</span>
+      <span><span className="sw" style={{background:'#e65100'}}></span>占用果树</span>
+      <span><span className="sw" style={{background:'#2e7d32'}}></span>装货点</span>
+      <span><span className="sw" style={{background:'#6a1b9a'}}></span>卸货点</span>
+      {hover&&<span>坐标 {hover.x|0}, {hover.y|0}　高程 {fmt(elev(hover.x,hover.y))} m</span>}
+    </div>
+  </div>;
+}
+
+/* ================= 主应用 ================= */
+const LS_KEY='orchard-monorail-v1';
+function loadState(){
+  try{const s=localStorage.getItem(LS_KEY);if(s)return JSON.parse(s);}catch(e){}
+  return{lines:[],activeId:null,operator:'',role:'技术员'};
+}
+function App(){
+  const[st,setSt]=useState(loadState);
+  const[tab,setTab]=useState('plan');
+  const[mode,setMode]=useState('draw');
+  const[exp,setExp]=useState(null);
+  const photos=useRef({}); // 验收照片仅本次会话保留
+  const[,tick]=useState(0);
+  useEffect(()=>{try{localStorage.setItem(LS_KEY,JSON.stringify(st));}catch(e){}},[st]);
+  const line=st.lines.find(l=>l.id===st.activeId)||null;
+  const analyses=useMemo(()=>{const m={};st.lines.forEach(l=>{m[l.id]=analyze(l.points);});return m;},[st.lines]);
+  const an=line?analyses[line.id]:null;
+
+  const updateLine=(id,fn)=>setSt(s=>({...s,lines:s.lines.map(l=>l.id===id?fn({...l}):l)}));
+  const log=(l,action)=>({...l,log:[...(l.log||[]),{t:nowStr(),who:st.operator||st.role,action}]});
+  const newLine=()=>{
+    const L={id:uid(),name:'线路 '+(st.lines.length+1),area:AREAS[st.lines.length%AREAS.length],
+      status:'草稿',points:[],stations:{},orders:{},accept:{},log:[{t:nowStr(),who:st.operator||st.role,action:'创建线路（草稿）'}]};
+    setSt(s=>({...s,lines:[...s.lines,L],activeId:L.id}));setMode('draw');setTab('plan');
+  };
+  const demo=()=>{
+    const L={id:uid(),name:'示例·东坡1线',area:'东坡片区',status:'草稿',
+      points:[{x:90,y:640},{x:220,y:600},{x:330,y:560},{x:420,y:470},{x:480,y:380},{x:560,y:330},{x:680,y:300},{x:800,y:270},{x:900,y:220}],
+      stations:{load:30,unload:780},orders:{},accept:{},
+      log:[{t:nowStr(),who:st.operator||st.role,action:'载入示例线路'}]};
+    setSt(s=>({...s,lines:[...s.lines,L],activeId:L.id}));setTab('plan');
+  };
+  const onMapAct=a=>{
+    if(!line)return;
+    updateLine(line.id,l=>{
+      if(a.type==='add')return{...l,points:[...l.points,{x:Math.round(a.p.x),y:Math.round(a.p.y)}]};
+      if(a.type==='move'){const ps=l.points.slice();ps[a.i]={x:Math.round(a.p.x),y:Math.round(a.p.y)};return{...l,points:ps};}
+      if(a.type==='del')return{...l,points:l.points.filter((_,i)=>i!==a.i)};
+      if(a.type==='load')return{...l,stations:{...l.stations,load:a.s}};
+      if(a.type==='unload')return{...l,stations:{...l.stations,unload:a.s}};
+      return l;
+    });
+  };
+  const doFlow=(to,label)=>{
+    if(to==='已验收'&&an){
+      const ok=an.segs.every(sg=>line.accept&&line.accept[sg.idx]&&line.accept[sg.idx].result==='合格');
+      if(!ok)return;
+    }
+    updateLine(line.id,l=>log({...l,status:to},`${l.status} → ${to}（${label}）`));
+  };
+
+  /* ---------- 模块1：线路规划 ---------- */
+  const editable=line&&(line.status==='草稿'||line.status==='待审核');
+  const Plan=()=>{
+    if(!line)return<div className="card hint">请新建或选择一条线路。地图上点击即可绘制轨道走向。</div>;
+    const st0=line.stations||{};
+    const stDist=(st0.load!=null&&st0.unload!=null)?Math.abs(st0.unload-st0.load):null;
+    const tc=an?transportCalc(stDist!=null?stDist:an.len,an.maxSlope):null;
+    return<div className="layout">
+      <div className="side">
+        <div className="card">
+          <h3>线路信息</h3>
+          <div className="row" style={{marginBottom:8}}>
+            <label className="fl">名称<input value={line.name} onChange={e=>updateLine(line.id,l=>({...l,name:e.target.value}))}/></label>
+            <label className="fl">片区
+              <select value={line.area} onChange={e=>updateLine(line.id,l=>({...l,area:e.target.value}))}>
+                {AREAS.map(a=><option key={a}>{a}</option>)}
+              </select></label>
+            <span className={'badge b-'+line.status}>{line.status}</span>
+          </div>
+          <div className="row modebar">
+            <button className={'ghost act sm'+(mode==='draw'?' on':'')} disabled={!editable} onClick={()=>setMode('draw')}>画线</button>
+            <button className={'ghost act sm'+(mode==='edit'?' on':'')} disabled={!editable} onClick={()=>setMode('edit')}>拖动/删点</button>
+            <button className={'ghost act sm'+(mode==='load'?' on':'')} onClick={()=>setMode('load')}>设装货点</button>
+            <button className={'ghost act sm'+(mode==='unload'?' on':'')} onClick={()=>setMode('unload')}>设卸货点</button>
+            <button className="act sm dng" disabled={!editable} onClick={()=>updateLine(line.id,l=>({...l,points:[],stations:{}}))}>清空</button>
+          </div>
+          {!editable&&<div className="hint" style={{marginTop:6}}>当前状态为「{line.status}」，走向已锁定；如需改线请走状态变更。</div>}
+          {editable&&<div className="hint" style={{marginTop:6}}>画线模式：在地图上单击依次加点；拖动/删点模式：左键拖动顶点、右键删除顶点。</div>}
+        </div>
+        {an&&<div className="card">
+          <h3>坡度与占行分析</h3>
+          <div className="kv">
+            <span>线路总长</span><b>{fmt(an.len)} m（{an.segs.length} 段）</b>
+            <span>最大坡度</span><b style={{color:an.maxSlope>MAX_SLOPE?'var(--danger)':'var(--ok)'}}>{fmt(an.maxSlope)}°</b>
+            <span>最长连续坡长</span><b>{fmt(an.maxCont)} m</b>
+            <span>超限坡段</span><b>{an.red.length} 处</b>
+            <span>小半径弯</span><b>{an.badVerts.length} 处</b>
+            <span>占用果树</span><b>{an.occupied.length} 株</b>
+            <span>迁移补偿</span><b>{yuan(an.occupied.length*PRICE.tree)}（{PRICE.tree} 元/株）</b>
+          </div>
+          {an.red.map((r,i)=><div key={'r'+i} className="warn-item">⚠ {km(r.s0)}~{km(r.s1)} 坡度达 {fmt(r.max)}°，超过 35°，建议改线绕开。</div>)}
+          {an.badVerts.map((v,i)=><div key={'v'+i} className="warn-item">⚠ {km(v.s)} 处转弯半径 {fmt(v.R)} m &lt; 4 m，建议放大弯道或改线。</div>)}
+        </div>}
+        {an&&<div className="card">
+          <h3>运输测算</h3>
+          {stDist==null&&<div className="hint">尚未同时设置装货点与卸货点，暂按全线长度测算。</div>}
+          <div className="kv">
+            <span>运距（单程）</span><b>{fmt(stDist!=null?stDist:an.len)} m</b>
+            <span>单趟载重</span><b>{tc.load} kg（按最大坡度折减）</b>
+            <span>平均速度</span><b>{fmt(tc.v,2)} m/s</b>
+            <span>往返耗时</span><b>{fmt(tc.tMin)} min（含装卸 10 min）</b>
+          </div>
+        </div>}
+        <div className="card">
+          <h3>状态流转</h3>
+          <div className="row">
+            {(FLOW[line.status]||[]).map(([label,to])=>{
+              const needAll=to==='已验收';
+              const okAll=!needAll||(an&&an.segs.every(sg=>line.accept&&line.accept[sg.idx]&&line.accept[sg.idx].result==='合格'));
+              return<button key={to} className="act sm" disabled={!okAll}
+                title={needAll&&!okAll?'需全部分段验收合格':''}
+                onClick={()=>doFlow(to,label)}>{label}</button>;})}
+          </div>
+          <div style={{marginTop:8,maxHeight:130,overflowY:'auto'}}>
+            {(line.log||[]).slice().reverse().map((g,i)=><div key={i} className="hint">{g.t}　{g.who}　{g.action}</div>)}
+          </div>
+        </div>
+      </div>
+      <div className="main">
+        <MapCanvas line={line} otherLines={st.lines.filter(l=>l.id!==line.id)} analysis={an}
+          mode={mode} editable={editable} onAct={onMapAct}/>
+      </div>
+    </div>;
+  };
+
+  /* ---------- 模块2：施工工单 ---------- */
+  const Orders=()=>{
+    if(!line||!an)return<div className="card hint">请先在「线路规划」中绘制线路。</div>;
+    const open=line.status==='施工中';
+    const auto=()=>updateLine(line.id,l=>{
+      const orders={...l.orders};
+      an.segs.forEach(sg=>{if(!orders[sg.idx]){
+        const c=Math.round(sg.len/2)+1;
+        orders[sg.idx]={columns:c,bolts:c*4,concrete:+(c*0.08).toFixed(2),status:'未开工'};}});
+      return log({...l,orders},'按规范自动生成分段工单');
+    });
+    const setO=(idx,k,v)=>updateLine(line.id,l=>({...l,orders:{...l.orders,[idx]:{...l.orders[idx],...{[k]:v}}}}));
+    const inv=investOf(line,an);
+    return<div className="card">
+      <div className="row" style={{justifyContent:'space-between'}}>
+        <h3 style={{margin:0}}>分段施工工单 — {line.name} <span className={'badge b-'+line.status}>{line.status}</span></h3>
+        <div className="row">
+          {!open&&<span className="hint">线路处于「{line.status}」，工单只读（施工中可填）</span>}
+          <button className="act sm" disabled={!open} onClick={auto}>按规范自动生成（立柱间距2m）</button>
+        </div>
+      </div>
+      <div className="tbl-wrap" style={{marginTop:8}}>
+      <table>
+        <thead><tr><th>段号</th><th>里程</th><th>长度(m)</th><th>设计最大坡度(°)</th><th>立柱(根)</th><th>膨胀螺栓(个)</th><th>混凝土(m³)</th><th>施工状态</th></tr></thead>
+        <tbody>
+        {an.segs.map(sg=>{const o=(line.orders||{})[sg.idx]||{};
+          return<tr key={sg.idx}>
+            <td>S{sg.idx+1}</td><td>{km(sg.s0)}~{km(sg.s1)}</td><td>{fmt(sg.len)}</td>
+            <td style={{color:sg.maxSlope>MAX_SLOPE?'var(--danger)':'inherit'}}>{fmt(sg.maxSlope)}</td>
+            <td><input type="number" min="0" disabled={!open} value={o.columns??''} onChange={e=>setO(sg.idx,'columns',e.target.value)}/></td>
+            <td><input type="number" min="0" disabled={!open} value={o.bolts??''} onChange={e=>setO(sg.idx,'bolts',e.target.value)}/></td>
+            <td><input type="number" min="0" step="0.01" disabled={!open} value={o.concrete??''} onChange={e=>setO(sg.idx,'concrete',e.target.value)}/></td>
+            <td><select disabled={!open} value={o.status||'未开工'} onChange={e=>setO(sg.idx,'status',e.target.value)}>
+              {['未开工','施工中','已完工'].map(x=><option key={x}>{x}</option>)}</select></td>
+          </tr>;})}
+        </tbody>
+        <tfoot><tr><td colSpan="4"><b>合计 / 投资估算</b></td>
+          <td><b>{inv.c}</b></td><td><b>{inv.b}</b></td><td><b>{fmt(inv.con,2)}</b></td>
+          <td><b>{yuan(inv.total)}</b></td></tr></tfoot>
+      </table>
+      </div>
+      <div className="hint" style={{marginTop:6}}>投资 = 轨道 {PRICE.rail} 元/m + 立柱 {PRICE.column} 元/根 + 螺栓 {PRICE.bolt} 元/个 + 混凝土 {PRICE.concrete} 元/m³ + 迁树补偿 {PRICE.tree} 元/株。</div>
+    </div>;
+  };
+
+  /* ---------- 模块3：验收管理 ---------- */
+  const Accept=()=>{
+    if(!line||!an)return<div className="card hint">请先在「线路规划」中绘制线路。</div>;
+    const open=line.status==='施工中';
+    const setA=(idx,patch)=>updateLine(line.id,l=>({...l,accept:{...l.accept,[idx]:{...(l.accept[idx]||{rework:0}),...patch}}}));
+    const pass=idx=>{const a=(line.accept||{})[idx];if(!a||a.slope===''||a.slope==null)return;
+      setA(idx,{result:'合格',by:st.operator||st.role,time:nowStr()});
+      updateLine(line.id,l=>log(l,`S${idx+1} 验收合格（实测 ${a.slope}°）`));};
+    const reject=idx=>{const a=(line.accept||{})[idx]||{};
+      updateLine(line.id,l=>log({...l,
+        accept:{...l.accept,[idx]:{...a,result:'不合格',rework:(a.rework||0)+1,by:st.operator||st.role,time:nowStr()}},
+        orders:{...l.orders,[idx]:{...(l.orders[idx]||{}),status:'施工中'}}},
+        `S${idx+1} 验收不合格，退回返工（第 ${(a.rework||0)+1} 次）`));};
+    const onPhoto=(idx,e)=>{const f=e.target.files&&e.target.files[0];if(!f)return;
+      const r=new FileReader();r.onload=()=>{photos.current[line.id+':'+idx]=r.result;tick(t=>t+1);};r.readAsDataURL(f);};
+    return<div className="card">
+      <div className="row" style={{justifyContent:'space-between'}}>
+        <h3 style={{margin:0}}>分段验收 — {line.name} <span className={'badge b-'+line.status}>{line.status}</span></h3>
+        {!open&&<span className="hint">线路处于「{line.status}」，验收只读</span>}
+      </div>
+      <div className="tbl-wrap" style={{marginTop:8}}>
+      <table>
+        <thead><tr><th>段号</th><th>设计坡度(°)</th><th>实测坡度(°)</th><th>判定</th><th>照片</th><th>返工次数</th><th>验收人/时间</th><th>操作</th></tr></thead>
+        <tbody>
+        {an.segs.map(sg=>{const a=(line.accept||{})[sg.idx]||{};
+          const sv=a.slope===''||a.slope==null?null:+a.slope;
+          const judge=sv==null?'—':(sv<=MAX_SLOPE?'可合格':'应退回');
+          const ph=photos.current[line.id+':'+sg.idx];
+          return<tr key={sg.idx}>
+            <td>S{sg.idx+1}</td>
+            <td style={{color:sg.maxSlope>MAX_SLOPE?'var(--danger)':'inherit'}}>{fmt(sg.maxSlope)}</td>
+            <td style={{width:90}}><input type="number" step="0.1" disabled={!open} value={a.slope??''} onChange={e=>setA(sg.idx,{slope:e.target.value,result:null})}/></td>
+            <td>{a.result?<span className="badge" style={{background:a.result==='合格'?'var(--ok-soft)':'var(--danger-soft)',color:a.result==='合格'?'var(--ok)':'var(--danger)'}}>{a.result}</span>:<span className="hint">{judge}</span>}</td>
+            <td>{ph&&<img className="thumb" src={ph} alt=""/>}
+              {open&&<input type="file" accept="image/*" style={{fontSize:11,width:150}} onChange={e=>onPhoto(sg.idx,e)}/>}</td>
+            <td style={{textAlign:'center',color:(a.rework||0)>0?'var(--danger)':'inherit'}}><b>{a.rework||0}</b></td>
+            <td className="hint">{a.by||''}{a.time&&<br/>}{a.time||''}</td>
+            <td style={{whiteSpace:'nowrap'}}>
+              <button className="act sm" disabled={!open||sv==null||sv>MAX_SLOPE} onClick={()=>pass(sg.idx)}>验收合格</button>{' '}
+              <button className="act sm dng" disabled={!open} onClick={()=>reject(sg.idx)}>退回返工</button>
+            </td>
+          </tr>;})}
+        </tbody>
+      </table>
+      </div>
+      <div className="hint" style={{marginTop:6}}>实测坡度 ≤35° 方可验收合格；不合格段退回返工并累计返工次数。照片仅保留在本次会话中。</div>
+    </div>;
+  };
+
+  /* ---------- 模块4：状态看板 ---------- */
+  const Dash=()=>{
+    const perArea=AREAS.map(area=>{
+      const ls=st.lines.filter(l=>l.area===area);
+      let len=0,inv=0,rw=0;
+      ls.forEach(l=>{const a=analyses[l.id];if(a)len+=a.len;inv+=investOf(l,a).total;
+        Object.values(l.accept||{}).forEach(x=>rw+=x.rework||0);});
+      return{area,n:ls.length,len,inv,rw};
+    });
+    const logs=st.lines.flatMap(l=>(l.log||[]).map(g=>({...g,line:l.name})))
+      .sort((a,b)=>a.t<b.t?1:-1).slice(0,60);
+    const mkCsv=kind=>{
+      let rows=[];
+      if(kind==='材料清单'){
+        rows=[['线路','片区','段号','里程','长度(m)','立柱(根)','膨胀螺栓(个)','混凝土(m³)']];
+        st.lines.forEach(l=>{const a=analyses[l.id];if(!a)return;
+          a.segs.forEach(sg=>{const o=(l.orders||{})[sg.idx]||{};
+            rows.push([l.name,l.area,'S'+(sg.idx+1),km(sg.s0)+'~'+km(sg.s1),fmt(sg.len),o.columns||0,o.bolts||0,o.concrete||0]);});
+          const inv=investOf(l,a);
+          rows.push([l.name,'合计','','',fmt(a.len),inv.c,inv.b,fmt(inv.con,2)]);});
+      }else{
+        rows=[['线路','片区','段号','设计最大坡度(°)','实测坡度(°)','验收结果','返工次数','验收人','时间']];
+        st.lines.forEach(l=>{const a=analyses[l.id];if(!a)return;
+          a.segs.forEach(sg=>{const ac=(l.accept||{})[sg.idx]||{};
+            rows.push([l.name,l.area,'S'+(sg.idx+1),fmt(sg.maxSlope),ac.slope??'',ac.result||'未验收',ac.rework||0,ac.by||'',ac.time||'']);});});
+      }
+      return rows.map(r=>r.join(',')).join('\n');
+    };
+    return<div>
+      <div className="grid4">
+        {perArea.map(p=><div key={p.area} className="stat">
+          <div className="k">{p.area}　{p.n} 条线路</div>
+          <div className="v">{fmt(p.len,0)} m</div>
+          <div className="k">投资 {yuan(p.inv)}　返工 {p.rw} 段次</div>
+        </div>)}
+      </div>
+      <div className="card" style={{marginTop:12}}>
+        <div className="row" style={{justifyContent:'space-between'}}>
+          <h3 style={{margin:0}}>线路状态总览</h3>
+          <div className="row">
+            <button className="act sm" onClick={()=>setExp({kind:'材料清单',csv:mkCsv('材料清单')})}>导出材料清单</button>
+            <button className="act sm" onClick={()=>setExp({kind:'验收单',csv:mkCsv('验收单')})}>导出验收单</button>
+          </div>
+        </div>
+        <div className="tbl-wrap" style={{marginTop:8}}>
+        <table>
+          <thead><tr><th>线路</th><th>片区</th><th>状态</th><th>长度(m)</th><th>最大坡度(°)</th><th>超限/小半径</th><th>占用株数</th><th>投资</th><th>返工段次</th></tr></thead>
+          <tbody>
+          {st.lines.map(l=>{const a=analyses[l.id];const inv=investOf(l,a);
+            const rw=Object.values(l.accept||{}).reduce((s,x)=>s+(x.rework||0),0);
+            return<tr key={l.id}>
+              <td><a href="#" onClick={e=>{e.preventDefault();setSt(s=>({...s,activeId:l.id}));setTab('plan');}}>{l.name}</a></td>
+              <td>{l.area}</td><td><span className={'badge b-'+l.status}>{l.status}</span></td>
+              <td>{a?fmt(a.len,0):'—'}</td><td>{a?fmt(a.maxSlope):'—'}</td>
+              <td style={{color:a&&(a.red.length||a.badVerts.length)?'var(--danger)':'inherit'}}>{a?a.red.length+' / '+a.badVerts.length:'—'}</td>
+              <td>{a?a.occupied.length:'—'}</td><td>{yuan(inv.total)}</td>
+              <td style={{color:rw?'var(--danger)':'inherit'}}>{rw}</td>
+            </tr>;})}
+          {!st.lines.length&&<tr><td colSpan="9" className="hint">暂无线路，请到「线路规划」新建。</td></tr>}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <div className="card" style={{marginTop:12}}>
+        <h3>变更与状态记录（留人留时）</h3>
+        <div style={{maxHeight:260,overflowY:'auto'}}>
+        <table>
+          <thead><tr><th>时间</th><th>线路</th><th>操作人</th><th>事项</th></tr></thead>
+          <tbody>{logs.map((g,i)=><tr key={i}><td className="hint">{g.t}</td><td>{g.line}</td><td>{g.who}</td><td>{g.action}</td></tr>)}</tbody>
+        </table>
+        </div>
+      </div>
+    </div>;
+  };
+
+  return<div className="app">
+    <header className="top">
+      <div>
+        <h1>山地果园单轨运输机线路规划与施工验收系统</h1>
+        <div className="sub">等高线选线 · 坡度/转弯半径校核 · 分段工单 · 验收返工 · 投资看板</div>
+      </div>
+      <div className="row">
+        <label className="fl">操作人<input value={st.operator} placeholder="姓名" style={{width:100}}
+          onChange={e=>setSt(s=>({...s,operator:e.target.value}))}/></label>
+        <label className="fl">角色
+          <select value={st.role} onChange={e=>setSt(s=>({...s,role:e.target.value}))}>
+            {['技术员','施工员','验收员','管理员'].map(r=><option key={r}>{r}</option>)}
+          </select></label>
+      </div>
+    </header>
+    <div className="tabs">
+      {[['plan','① 线路规划'],['orders','② 施工工单'],['accept','③ 验收管理'],['dash','④ 状态看板']].map(([k,t])=>
+        <button key={k} className={tab===k?'on':''} onClick={()=>setTab(k)}>{t}</button>)}
+      <span style={{flex:1}}></span>
+      <select value={st.activeId||''} onChange={e=>setSt(s=>({...s,activeId:e.target.value}))}>
+        <option value="" disabled>选择线路…</option>
+        {st.lines.map(l=><option key={l.id} value={l.id}>{l.name}（{l.status}）</option>)}
+      </select>
+      <button className="act sm" onClick={newLine}>＋ 新建线路</button>
+      <button className="act sm ghost" onClick={demo}>载入示例</button>
+      {line&&<button className="act sm dng" onClick={()=>{if(line.status!=='草稿')return;
+        setSt(s=>({...s,lines:s.lines.filter(l=>l.id!==line.id),activeId:null}));}} disabled={line.status!=='草稿'} title="仅草稿可删除">删除线路</button>}
+    </div>
+    {tab==='plan'&&<Plan/>}
+    {tab==='orders'&&<Orders/>}
+    {tab==='accept'&&<Accept/>}
+    {tab==='dash'&&<Dash/>}
+    {exp&&<div className="modal-mask" onClick={()=>setExp(null)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div className="row" style={{justifyContent:'space-between'}}>
+          <h3 style={{margin:0}}>{exp.kind}（CSV）</h3>
+          <div className="row">
+            <button className="act sm" onClick={e=>{
+              const ta=e.target.closest('.modal').querySelector('textarea');
+              if(navigator.clipboard&&navigator.clipboard.writeText){
+                navigator.clipboard.writeText(exp.csv).catch(()=>{ta.select();document.execCommand('copy');});
+              }else{ta.select();document.execCommand('copy');}
+              e.target.textContent='已复制';setTimeout(()=>e.target.textContent='复制',1200);
+            }}>复制</button>
+            <button className="act sm ghost" onClick={()=>setExp(null)}>关闭</button>
+          </div>
+        </div>
+        <textarea readOnly value={exp.csv}/>
+        <div className="hint">复制后可粘贴到 Excel / WPS 保存为 .csv 或 .xlsx。</div>
+      </div>
+    </div>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
